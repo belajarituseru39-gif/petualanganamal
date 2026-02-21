@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Petualangan Amal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Fredoka', sans-serif; overflow: hidden; touch-action: none; background-color: #2c3e50; user-select: none; margin: 0; padding: 0; }
+        canvas { display: block; width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; z-index: 0; }
+        
+        /* UI Layers */
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; display: flex; flex-direction: column; }
+        .interactive { pointer-events: auto; }
+        .hidden { display: none !important; }
+        
+        .btn-game { transition: transform 0.1s, filter 0.1s; }
+        .btn-game:active { transform: scale(0.95); filter: brightness(0.9); }
+        
+        @keyframes floatUp { 0% { transform: translateY(0) scale(1); opacity: 1; } 100% { transform: translateY(-100px) scale(1.5); opacity: 0; } }
+        .score-popup { position: absolute; font-weight: bold; font-size: 2rem; animation: floatUp 0.8s ease-out forwards; text-shadow: 2px 2px 0 #fff; z-index: 100; pointer-events: none; }
+        
+        .draggable-item { touch-action: none; cursor: grab; user-select: none; pointer-events: auto !important; }
+        .draggable-item:active { cursor: grabbing; z-index: 50; transform: scale(1.1); }
+        
+        .slot-active { background-color: #dcfce7; border-color: #22c55e; }
+        .pedestal-glow { box-shadow: 0 0 20px rgba(251, 191, 36, 0.6); transform: scale(1.05); }
+        
+        .connector-point { width: 16px; height: 16px; background: white; border: 3px solid #fbbf24; border-radius: 50%; position: absolute; top: 50%; transform: translateY(-50%); }
+        .connector-left { right: -8px; } .connector-right { left: -8px; }
+        .connected-box { background-color: #d1fae5 !important; border-color: #10b981 !important; color: #065f46 !important; }
+        
+        .calc-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; }
+        
+        /* Map Progress Badge */
+        .progress-badge { position: absolute; bottom: -10px; left: 50%; transform: translateX(-50%); background: #fbbf24; border: 2px solid white; border-radius: 99px; padding: 2px 8px; color: #78350f; font-weight: bold; font-size: 0.75rem; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        
+        /* Custom Backgrounds */
+        .bg-cover-image { background-size: cover; background-position: center; background-repeat: no-repeat; }
+    </style>
+</head>
+<body>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- TOP RIGHT BUTTONS (Music & Fullscreen) -->
+    <div class="fixed top-4 right-4 z-[100] flex gap-2 pointer-events-auto">
+        <button onclick="toggleMusic()" id="btn-music" class="bg-black/30 hover:bg-black/50 text-white p-3 rounded-full backdrop-blur-sm transition-all border-2 border-white/50" title="Musik">
+            <span style="font-size: 1.5rem;">🎵</span>
+        </button>
+        <button onclick="toggleFullScreen()" class="bg-black/30 hover:bg-black/50 text-white p-3 rounded-full backdrop-blur-sm transition-all border-2 border-white/50" title="Layar Penuh">
+            <span style="font-size: 1.5rem;">⛶</span>
+        </button>
+    </div>
+
+    <div id="ui-layer">
+        
+        <!-- MAIN MENU -->
+        <div id="screen-menu" class="absolute inset-0 flex flex-col items-center justify-center bg-sky-100 interactive z-50 px-4 text-center bg-cover-image" style="background-image: url('https://i.imgur.com/nfKD9ce.jpeg');">
+            <div class="absolute inset-0 bg-white/60 backdrop-blur-sm z-[-1]"></div>
+
+            <h1 class="text-4xl md:text-7xl font-black text-sky-800 mb-2 drop-shadow-md tracking-tight uppercase">PETUALANGAN AMAL</h1>
+            <p class="text-xl md:text-2xl text-sky-900 mb-6 font-bold tracking-wide">Misi Kebaikan Siswa</p>
+            
+            <div class="bg-white/90 p-6 rounded-2xl shadow-lg max-w-2xl mb-8 border-2 border-sky-200">
+                <p class="text-slate-800 text-lg md:text-xl leading-relaxed italic font-semibold">
+                    "Selamat datang, Petualang Cilik! Mari berpetualang, kumpulkan bekal ilmu agama, dan tebarkan kebaikan melalui misi-misi seru. Siapkan hatimu untuk berbagi!"
+                </p>
+            </div>
+
+            <p class="text-slate-800 font-bold mb-4 text-lg">Pilih Karaktermu:</p>
+            <div class="flex gap-8 mb-12">
+                <button onclick="game.initGame('Alif')" class="btn-game flex flex-col items-center p-4 bg-white rounded-3xl shadow-xl border-4 border-orange-400 hover:bg-orange-50 w-40 md:w-48 transform hover:-translate-y-2 transition-all">
+                    <img src="https://i.imgur.com/fBmcG96.png" class="w-24 h-24 object-contain mb-2" alt="Alif">
+                    <span class="text-xl font-bold text-slate-700">Alif</span>
+                </button>
+                <button onclick="game.initGame('Alya')" class="btn-game flex flex-col items-center p-4 bg-white rounded-3xl shadow-xl border-4 border-pink-400 hover:bg-pink-50 w-40 md:w-48 transform hover:-translate-y-2 transition-all">
+                    <img src="https://i.imgur.com/22fUhA6.png" class="w-24 h-24 object-contain mb-2" alt="Alya">
+                    <span class="text-xl font-bold text-slate-700">Alya</span>
+                </button>
+            </div>
+
+            <div class="absolute bottom-4 text-xs md:text-sm text-slate-800 bg-white/90 px-6 py-2 rounded-full shadow-lg border border-slate-200">
+                <p><strong>Ide Permainan:</strong> Abdul Rahmat, S.Pd (SDN 011 Balikpapan Tengah) | <strong>Kontak:</strong> 081351767574</p>
+            </div>
+        </div>
+
+        <!-- MAP SELECT -->
+        <div id="screen-map" class="absolute inset-0 bg-emerald-50 hidden interactive z-40 overflow-y-auto bg-cover-image" style="background-image: url('https://i.imgur.com/nfKD9ce.jpeg');">
+             <div class="absolute inset-0 bg-white/80 backdrop-blur-sm z-[-1]"></div>
+             
+             <!-- NEW MAP HEADER (CENTER TOP) -->
+            <div class="absolute top-0 left-0 w-full flex justify-center pt-6 pointer-events-none z-50">
+                <div class="bg-white/95 backdrop-blur px-6 py-2 rounded-full shadow-xl border-2 border-slate-200 flex items-center gap-6 pointer-events-auto">
+                    <!-- Avatar & Score -->
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full overflow-hidden border-2 border-slate-300 bg-slate-100">
+                            <img id="map-avatar" src="" class="w-full h-full object-cover">
+                        </div>
+                        <div class="flex flex-col items-start leading-none">
+                            <span class="text-[10px] font-bold text-slate-500 uppercase">Total Koin</span>
+                            <span class="text-xl font-black text-emerald-600" id="map-total-score">0</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Divider -->
+                    <div class="w-px h-8 bg-slate-300"></div>
+
+                    <!-- Home Button -->
+                    <button onclick="location.reload()" class="bg-rose-500 hover:bg-rose-600 text-white px-4 py-2 rounded-full font-bold text-sm shadow transition-transform active:scale-95 flex items-center gap-2">
+                        <span>🏠</span> Menu
+                    </button>
+                </div>
+            </div>
+
+            <div class="min-h-full flex items-center justify-center pt-32 pb-24">
+                <div class="grid grid-cols-2 md:grid-cols-3 gap-12 z-10 relative max-w-6xl p-4" id="map-buttons">
+                    <!-- Buttons generated by JS -->
+                </div>
+            </div>
+        </div>
+
+        <!-- GAMEPLAY CONTAINER -->
+        <div id="game-container" class="absolute inset-0 hidden">
+            <!-- NEW HUD (CENTER TOP) -->
+            <div class="absolute top-0 w-full p-4 flex justify-center items-start z-30 pointer-events-none">
+                <div class="bg-white/90 backdrop-blur rounded-full shadow-lg border-2 border-amber-200 px-3 py-2 flex items-center gap-4 pointer-events-auto">
+                     <button onclick="game.backToMap()" class="bg-rose-100 hover:bg-rose-200 text-rose-700 p-2 rounded-full font-bold transition-colors w-10 h-10 flex items-center justify-center" title="Keluar">⏹</button>
+                     <div class="w-px h-6 bg-slate-300"></div>
+                     <div class="flex items-center gap-2 pr-2">
+                        <span class="text-2xl">🪙</span>
+                        <span id="score-display" class="text-xl font-bold text-amber-600">0/100</span>
+                     </div>
+                </div>
+            </div>
+            
+            <!-- Dynamic Content Area -->
+            <div id="level-content" class="w-full h-full relative pointer-events-auto flex flex-col"></div>
+        </div>
+
+        <!-- FINAL SUMMARY SCREEN -->
+        <div id="screen-final" class="absolute inset-0 bg-black/95 hidden flex-col items-center justify-center interactive z-50 text-white p-8 text-center">
+            <div class="text-8xl mb-4 animate-bounce">🏆</div>
+            <h1 class="text-5xl font-bold text-yellow-400 mb-2">SELAMAT!</h1>
+            <p class="text-2xl mb-8 opacity-90">Kamu Telah Menyelesaikan Petualangan Amal</p>
+            
+            <div class="bg-white/10 p-8 rounded-3xl border-4 border-yellow-500 mb-8 w-full max-w-lg shadow-2xl backdrop-blur-md">
+                <p class="text-sm opacity-80 uppercase tracking-widest mb-2 font-bold">Total Koin Kebaikan</p>
+                <div class="text-7xl font-black text-yellow-300 mb-4" id="final-total-score">0</div>
+                <div class="h-1 w-full bg-white/20 rounded-full mb-4"></div>
+                <p class="text-xl italic font-serif text-yellow-100" id="final-rank-text">"Pahlawan Kebaikan Sejati!"</p>
+            </div>
+            
+            <button onclick="location.reload()" class="bg-blue-500 hover:bg-blue-600 text-white px-12 py-4 rounded-full font-bold text-2xl shadow-xl transition-transform active:scale-95 border-b-8 border-blue-700">
+                MAIN LAGI 🔄
+            </button>
+        </div>
+
+    </div>
+
+<script>
+// --- ASSET MANAGER ---
+const ASSETS = {
+    bg_game: "https://i.imgur.com/nfKD9ce.jpeg",
+    char_alif: "https://i.imgur.com/fBmcG96.png",
+    char_alya: "https://i.imgur.com/22fUhA6.png",
+    levels: [
+        null, // Index 0 empty
+        { logo: "https://i.imgur.com/YD93eZ5.png", bg: "https://i.imgur.com/98yNkj5.jpeg" }, // 1
+        { logo: "https://i.imgur.com/E7Eaq2Q.png", bg: "https://i.imgur.com/ZoRpZOb.jpeg" }, // 2
+        { logo: "https://i.imgur.com/jfDacNK.png", bg: "https://i.imgur.com/HyAxHER.jpeg" }, // 3
+        { logo: "https://i.imgur.com/OeScR1Q.png", bg: "https://i.imgur.com/QbDYvzn.jpeg" }, // 4
+        { logo: "https://i.imgur.com/aemFri2.png", bg: "https://i.imgur.com/1kpbM6m.jpeg" }, // 5
+        { logo: "https://i.imgur.com/H9iwZ4n.png", bg: "https://i.imgur.com/lM2OyiF.jpeg" }  // 6
+    ]
+};
+
+// --- AUDIO SYSTEM (GLOBAL) ---
+const AudioMgr = {
+    ctx: null,
+    bgm: null,
+    isPlaying: false,
+    
+    init: function() {
+        if (!this.ctx) {
+            this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        // Initialize BGM
+        if (!this.bgm) {
+            this.bgm = new Audio('https://github.com/belajarituseru39-gif/lagupetualanganamal/raw/refs/heads/main/Petualangan%20Amal.mp3');
+            this.bgm.loop = true;
+            this.bgm.volume = 0.5;
+        }
+    },
+    
+    startBGM: function() {
+        if (this.bgm && !this.isPlaying) {
+            this.bgm.play().then(() => {
+                this.isPlaying = true;
+                this.updateBtn();
+            }).catch(e => console.log("Audio autoplay prevented:", e));
+        }
+    },
+    
+    toggleBGM: function() {
+        if (!this.bgm) return;
+        if (this.isPlaying) {
+            this.bgm.pause();
+            this.isPlaying = false;
+        } else {
+            this.bgm.play();
+            this.isPlaying = true;
+        }
+        this.updateBtn();
+    },
+    
+    updateBtn: function() {
+        const btn = document.getElementById('btn-music');
+        if (btn) btn.innerHTML = this.isPlaying ? '<span style="font-size: 1.5rem;">🎵</span>' : '<span style="font-size: 1.5rem; filter: grayscale(1);">🔇</span>';
+    },
+
+    playTone: function(freq, type, duration, startTime = 0) {
+        if (!this.ctx) this.init();
+        if (this.ctx.state === 'suspended') this.ctx.resume();
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, this.ctx.currentTime + startTime);
+        gain.gain.setValueAtTime(0.1, this.ctx.currentTime + startTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + startTime + duration);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(this.ctx.currentTime + startTime);
+        osc.stop(this.ctx.currentTime + startTime + duration);
+    },
+    playCorrect: function() {
+        this.playTone(600, 'sine', 0.1, 0);
+        this.playTone(800, 'sine', 0.3, 0.1);
+    },
+    playWrong: function() {
+        this.playTone(150, 'sawtooth', 0.2, 0);
+        this.playTone(100, 'sawtooth', 0.3, 0.15);
+    },
+    playWin: function() {
+        [523.25, 659.25, 783.99, 1046.50].forEach((freq, i) => {
+            this.playTone(freq, 'square', 0.4, i * 0.15);
+        });
+    }
+};
+
+// --- HELPER FUNCTION (GLOBAL) ---
+function createPopup(x, y, txt, good) {
+    const el = document.createElement('div'); el.className = 'score-popup'; el.innerText = txt;
+    el.style.left = x+'px'; el.style.top = y+'px'; el.style.color = good ? '#fbbf24' : '#ef4444';
+    document.body.appendChild(el); setTimeout(()=>el.remove(), 800);
+}
+
+// TOGGLE FUNCTIONS
+function toggleFullScreen() {
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen().catch(err => {});
+  } else {
+    if (document.exitFullscreen) document.exitFullscreen();
+  }
+}
+
+function toggleMusic() {
+    AudioMgr.toggleBGM();
+}
+
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+const game = {
+    char: 'Alif', charImgUrl: '', width: window.innerWidth, height: window.innerHeight, activeLevel: null,
+    progress: {1:0, 2:0, 3:0, 4:0, 5:0, 6:0}, 
+    finalShown: false,
+    
+    init() { this.resize(); window.addEventListener('resize', ()=>this.resize()); this.loop(); this.renderMap(); },
+    resize() { this.width = window.innerWidth; this.height = window.innerHeight; canvas.width = this.width; canvas.height = this.height; },
+    initGame(c) {
+        AudioMgr.init(); 
+        AudioMgr.startBGM(); // Start music on first interaction
+        this.char = c;
+        this.charImgUrl = (c === 'Alif') ? ASSETS.char_alif : ASSETS.char_alya;
+        document.getElementById('map-avatar').src = this.charImgUrl;
+        document.getElementById('screen-menu').classList.add('hidden');
+        document.getElementById('screen-map').classList.remove('hidden');
+        this.renderMap();
+    },
+    renderMap() {
+        const levelNames = ["Taman Hijaiyah", "Sungai Wudhu", "Perpustakaan Kitab Allah", "Desa Para Nabi", "Gurun Puasa", "Masjid Zakat"];
+        const container = document.getElementById('map-buttons');
+        container.innerHTML = '';
+        let total = 0;
+        
+        levelNames.forEach((name, idx) => {
+            const num = idx+1;
+            const score = this.progress[num] || 0;
+            total += score;
+            const isDone = score > 0;
+            const asset = ASSETS.levels[num];
+            
+            const btn = document.createElement('button');
+            btn.className = `btn-game w-48 h-48 rounded-3xl bg-white border-b-8 border-slate-300 shadow-xl flex flex-col items-center justify-center relative overflow-hidden group`;
+            btn.onclick = () => this.startLevel(num);
+            
+            const img = document.createElement('img');
+            img.src = asset.logo;
+            img.className = "w-24 h-24 object-contain mb-2 transform group-hover:scale-110 transition-transform";
+            
+            btn.innerHTML = `
+                <div class="absolute inset-0 bg-slate-100 opacity-0 group-hover:opacity-10 transition-opacity"></div>
+            `;
+            btn.appendChild(img);
+            btn.innerHTML += `
+                <span class="font-bold text-lg text-slate-800">Misi ${num}</span>
+                <span class="text-xs text-slate-500 font-semibold px-2 text-center leading-tight">${name}</span>
+                <div class="progress-badge">${score}/100 🪙 ${isDone?'✅':''}</div>
+            `;
+            container.appendChild(btn);
+        });
+        document.getElementById('map-total-score').innerText = total;
+    },
+    startLevel(n) {
+        AudioMgr.init();
+        document.getElementById('screen-map').classList.add('hidden');
+        document.getElementById('game-container').classList.remove('hidden');
+        const LevelClass = [null, Level1, Level2, Level3, Level4, Level5, Level6][n];
+        if(LevelClass) {
+            this.activeLevel = new LevelClass('level-content', 'score-display', n);
+            this.activeLevel.showIntro();
+        }
+    },
+    backToMap() {
+        if(this.activeLevel) {
+            this.progress[this.activeLevel.levelNum] = Math.max(this.progress[this.activeLevel.levelNum], this.activeLevel.score);
+            if(this.activeLevel.destroy) this.activeLevel.destroy();
+        }
+        this.activeLevel = null;
+        document.getElementById('level-content').innerHTML = '';
+        document.getElementById('game-container').classList.add('hidden');
+        document.getElementById('screen-map').classList.remove('hidden');
+        this.renderMap();
+        this.checkAllCompleted(); 
+    },
+    checkAllCompleted() {
+        const allDone = Object.values(this.progress).every(score => score > 0);
+        if (allDone && !this.finalShown) {
+            this.finalShown = true;
+            AudioMgr.playWin();
+            const total = Object.values(this.progress).reduce((a,b)=>a+b, 0);
+            document.getElementById('final-total-score').innerText = total;
+            
+            let rank = "Pahlawan Kebaikan";
+            if(total >= 500) rank = "Sultan Amal Jariyah";
+            else if(total >= 300) rank = "Pejuang Sedekah";
+            document.getElementById('final-rank-text').innerText = `"${rank}"`;
+            
+            document.getElementById('screen-map').classList.add('hidden');
+            document.getElementById('screen-final').classList.remove('hidden');
+            document.getElementById('screen-final').style.display = 'flex';
+        }
+    },
+    loop() {
+        ctx.clearRect(0,0,this.width,this.height);
+        if(this.activeLevel && this.activeLevel.active) {
+            if(this.activeLevel.update) this.activeLevel.update();
+            if(this.activeLevel.draw) this.activeLevel.draw(ctx);
+        }
+        requestAnimationFrame(()=>this.loop());
+    }
+};
+
+class LevelBase {
+    constructor(cid, sid, num) {
+        this.container = document.getElementById(cid);
+        this.scoreEl = document.getElementById(sid);
+        this.score = 0;
+        this.active = false;
+        this.levelNum = num;
+        
+        this.bgImg = new Image();
+        this.bgImg.src = ASSETS.levels[num].bg;
+        
+        this.updateScore(0);
+    }
+    updateScore(pts) { this.score = Math.min(100, Math.max(0, this.score + pts)); this.scoreEl.innerText = this.score + "/100"; }
+    
+    showIntro() {
+        const meta = [
+            null,
+            {t:"Taman Hijaiyah", n:"Langit penuh balon huruf! Mari belajar sambil bermain.", i:"Pecahkan 10 balon sesuai urutan huruf yang diminta di layar."},
+            {t:"Sungai Wudhu", n:"Air suci mengalir tenang. Saatnya menyempurnakan wudhu.", i:"Fase 1: Urutkan 6 Rukun Wudhu. Fase 2: Pisahkan yang Wajib & Sunnah."},
+            {t:"Perpustakaan Kitab Allah", n:"Ilmu adalah cahaya. Kenali kitab-kitab Allah.", i:"Pasangkan Kitab dengan Nabi penerimanya, lalu pilih perilaku yang mencerminkan iman."},
+            {t:"Desa Para Nabi", n:"Jejak kesabaran para Rasul Ulul Azmi.", i:"Hubungkan Nabi dengan Mukjizatnya, lalu pilih sifat yang patut diteladani."},
+            {t:"Gurun Puasa", n:"Perjalanan panjang membutuhkan bekal taqwa.", i:"Tangkap (Hijau) hal yang SAH/BOLEH, Hindari (Merah) hal yang MEMBATALKAN."},
+            {t:"Masjid Zakat", n:"Mari sucikan harta dengan Zakat Fitrah.", i:"Hitung zakat berdasarkan soal cerita. Baca soal di kiri, hitung di kanan."}
+        ][this.levelNum];
+
+        this.container.innerHTML = `
+            <div class="absolute inset-0 bg-slate-800/90 flex flex-col items-center justify-center text-white z-50 p-6 text-center">
+                <h2 class="text-4xl font-bold text-yellow-400 mb-2">${meta.t}</h2>
+                <p class="mb-6 italic text-xl">"${meta.n}"</p>
+                <div class="bg-white/10 p-6 rounded-xl mb-8 text-lg text-left w-full max-w-md">
+                    <p class="font-bold text-yellow-200 mb-2">Cara Bermain:</p>
+                    <p>${meta.i}</p>
+                </div>
+                <button class="start-btn bg-green-500 hover:bg-green-600 text-white px-10 py-4 rounded-full font-bold text-2xl shadow-lg transition-transform active:scale-95">MULAI PETUALANGAN ▶</button>
+            </div>
+        `;
+        this.container.querySelector('.start-btn').onclick = () => {
+            this.container.innerHTML = '';
+            this.active = true;
+            this.start();
+        };
+    }
+
+    win(msg) {
+        AudioMgr.playWin(); 
+        game.progress[this.levelNum] = Math.max(game.progress[this.levelNum], this.score);
+        
+        this.container.innerHTML = `
+            <div class="absolute inset-0 bg-black/90 flex flex-col items-center justify-center text-white animate-bounce-small z-50 p-6 text-center">
+                <div class="text-8xl mb-4">🏆</div>
+                <h2 class="text-5xl font-bold text-yellow-400 mb-2">Misi Selesai!</h2>
+                <div class="bg-white/10 p-6 rounded-2xl mb-6 w-64">
+                    <p class="text-sm opacity-80 text-yellow-100 uppercase tracking-widest mb-1">Skor Akhir</p>
+                    <p class="text-6xl font-black">${this.score}</p>
+                </div>
+                <p class="text-xl mb-10 italic opacity-90">"${msg}"</p>
+                <button onclick="game.backToMap()" class="bg-green-500 hover:bg-green-600 text-white px-10 py-4 rounded-full font-bold text-2xl shadow-xl transition-all transform hover:scale-105 active:scale-95 border-b-8 border-green-700">
+                    KEMBALI KE PETA 🗺️
+                </button>
+            </div>`;
+    }
+    createEl(tag, cls, html) { const el=document.createElement(tag); el.className=cls; el.innerHTML=html; return el; }
+    drawBg(ctx) {
+        if(this.bgImg.complete) {
+            const ratio = Math.max(game.width / this.bgImg.width, game.height / this.bgImg.height);
+            const w = this.bgImg.width * ratio;
+            const h = this.bgImg.height * ratio;
+            ctx.drawImage(this.bgImg, (game.width - w) / 2, (game.height - h) / 2, w, h);
+        } else {
+            const grd = ctx.createLinearGradient(0,0,0,game.height); grd.addColorStop(0,"#bae6fd"); grd.addColorStop(1,"#f0f9ff");
+            ctx.fillStyle=grd; ctx.fillRect(0,0,game.width,game.height);
+        }
+    }
+    destroy() {}
+}
+
+/** LEVEL 1: TAMAN HIJAIYAH */
+class Level1 extends LevelBase {
+    constructor(cid, sid, n) { super(cid, sid, n); this.balloons=[]; this.timer=0; this.seqIdx=0;
+        this.allHijaiyah = [{c:'ا',n:'Alif'},{c:'ب',n:'Ba'},{c:'ت',n:'Ta'},{c:'ث',n:'Tsa'},{c:'ج',n:'Jim'},{c:'ح',n:'Ha'},{c:'خ',n:'Kho'},{c:'د',n:'Dal'},{c:'ذ',n:'Dzal'},{c:'ر',n:'Ro'},{c:'ز',n:'Zai'},{c:'س',n:'Sin'},{c:'ش',n:'Syin'},{c:'ص',n:'Sod'},{c:'ض',n:'Dhod'},{c:'ط',n:'Tho'},{c:'ظ',n:'Zho'},{c:'ع',n:'Ain'},{c:'غ',n:'Ghain'},{c:'ف',n:'Fa'},{c:'ق',n:'Qof'},{c:'ك',n:'Kaf'},{c:'ل',n:'Lam'},{c:'م',n:'Mim'},{c:'ن',n:'Nun'},{c:'و',n:'Waw'},{c:'ه',n:'Ha'},{c:'ي',n:'Ya'}];
+    }
+    start() {
+        this.sequence = [...this.allHijaiyah].sort(()=>Math.random()-0.5).slice(0,10);
+        this.updateMission();
+        this.handler = (e) => {
+            if(!this.active) return;
+            const t = e.changedTouches ? e.changedTouches[0] : e;
+            this.click(t.clientX, t.clientY);
+        };
+        window.addEventListener('mousedown', this.handler); window.addEventListener('touchstart', this.handler);
+    }
+    destroy() { window.removeEventListener('mousedown', this.handler); window.removeEventListener('touchstart', this.handler); }
+    updateMission() {
+        if(this.seqIdx < this.sequence.length) {
+            const t = this.sequence[this.seqIdx];
+            this.container.innerHTML = `<div class="absolute top-24 w-full text-center pointer-events-none z-10"><div class="bg-white/90 inline-block px-6 py-3 rounded-full shadow-lg text-slate-800 font-bold border-4 border-blue-400 text-2xl">Pecahkan Balon: ${t.n} (${t.c})</div></div>`;
+        }
+    }
+    update() {
+        if(this.seqIdx >= 10) { this.active=false; this.destroy(); this.win("Kamu hebat menghafal huruf Hijaiyah!"); return; }
+        if(++this.timer > 40) { this.spawn(); this.timer=0; }
+        for(let i=this.balloons.length-1; i>=0; i--) {
+            let b=this.balloons[i]; b.y-=b.speed; b.x+=Math.sin(b.y*0.01)*2;
+            if(b.y < -100) this.balloons.splice(i,1);
+        }
+    }
+    spawn() {
+        const tgt = this.sequence[this.seqIdx].c;
+        const dist = this.allHijaiyah.map(s=>s.c).filter(c=>c!==tgt);
+        let char = (Math.random()<0.4)?tgt:dist[Math.floor(Math.random()*dist.length)];
+        this.balloons.push({x:Math.random()*(game.width-100)+50, y:game.height+100, speed:2+Math.random()*3, char:char, color:char===tgt?'#f43f5e':`hsl(${Math.random()*360},70%,60%)`});
+    }
+    draw(ctx) {
+        this.drawBg(ctx);
+        this.balloons.forEach(b=>{
+            ctx.beginPath(); ctx.moveTo(b.x, b.y+60); ctx.lineTo(b.x, b.y+150); ctx.strokeStyle="rgba(255,255,255,0.8)"; ctx.stroke();
+            ctx.fillStyle=b.color; ctx.beginPath(); ctx.ellipse(b.x, b.y, 50, 65, 0, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle="white"; ctx.font="bold 40px Arial"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(b.char, b.x, b.y);
+        });
+    }
+    click(x,y) {
+        if(this.seqIdx>=this.sequence.length) return;
+        const tgt = this.sequence[this.seqIdx].c;
+        for(let i=this.balloons.length-1; i>=0; i--) {
+            const b=this.balloons[i];
+            if(Math.hypot(x-b.x, y-b.y)<70) {
+                this.balloons.splice(i,1);
+                if(b.char===tgt) { 
+                    this.updateScore(10); 
+                    this.seqIdx++; 
+                    this.updateMission();
+                    AudioMgr.playCorrect(); 
+                }
+                else { 
+                    createPopup(x, y, "Salah!", false);
+                    AudioMgr.playWrong(); 
+                }
+                break;
+            }
+        }
+    }
+}
+
+/** LEVEL 2: SUNGAI WUDHU */
+class Level2 extends LevelBase {
+    constructor(cid, sid, n) { super(cid, sid, n); this.phase = 1; this.completedSlots = 0; }
+    start() {
+        this.phase = 1;
+        this.container.innerHTML = `
+            <div class="w-full h-full flex flex-col items-center justify-end pb-8 pointer-events-none">
+                <div class="bg-white/90 px-6 py-2 rounded-xl mb-4 text-slate-700 font-bold shadow text-lg">Fase 1: Urutkan 6 Rukun Wudhu</div>
+                <div class="cards flex flex-wrap justify-center gap-4 p-4 w-full min-h-[150px] pointer-events-auto"></div>
+                <div class="slots flex flex-wrap justify-center gap-4 mt-4 mb-8 px-4 pointer-events-auto"></div>
+            </div>`;
+        this.setupPhase1();
+    }
+    setupPhase1() {
+        const slotsC = this.container.querySelector('.slots');
+        const cardsC = this.container.querySelector('.cards');
+        for(let i=1; i<=6; i++) {
+            const s = this.createEl('div', 'w-24 h-32 border-4 border-dashed border-slate-400 rounded-xl bg-white/80 text-slate-500 flex items-center justify-center text-4xl font-bold backdrop-blur-sm', i);
+            s.dataset.slotId = i; slotsC.appendChild(s);
+        }
+        const data = [{id:1,t:"Niat Wudhu",i:"💭"},{id:2,t:"Membasuh Wajah",i:"🤲"},{id:3,t:"Membasuh Tangan",i:"💪"},{id:4,t:"Mengusap Kepala",i:"💆"},{id:5,t:"Membasuh Kaki",i:"🦶"},{id:6,t:"Tertib / Urut",i:"🔄"}];
+        [...data].sort(()=>Math.random()-0.5).forEach(d => {
+            const c = this.createEl('div', 'draggable-item w-24 h-32 bg-white rounded-xl shadow-md border-2 border-cyan-500 flex flex-col items-center justify-center m-1', `<span class="text-4xl pointer-events-none mb-1">${d.i}</span><span class="text-sm font-bold pointer-events-none text-center px-1">${d.t}</span>`);
+            c.dataset.id = d.id; cardsC.appendChild(c); this.addDrag(c);
+        });
+    }
+    addDrag(el) {
+        let sx, sy, ix, iy;
+        const start = (e) => { const t=e.touches?e.touches[0]:e; sx=t.clientX; sy=t.clientY; const r=el.getBoundingClientRect(); ix=r.left; iy=r.top; el.style.position='fixed'; el.style.left=ix+'px'; el.style.top=iy+'px'; el.style.zIndex=100; el.style.width=r.width+'px'; el.style.pointerEvents='none'; window.addEventListener('mousemove', move); window.addEventListener('touchmove', move, {passive:false}); window.addEventListener('mouseup', end); window.addEventListener('touchend', end); };
+        const move = (e) => { e.preventDefault(); const t=e.touches?e.touches[0]:e; el.style.transform=`translate(${t.clientX-sx}px, ${t.clientY-sy}px) rotate(5deg)`; };
+        const end = (e) => { window.removeEventListener('mousemove', move); window.removeEventListener('touchmove', move); window.removeEventListener('mouseup', end); window.removeEventListener('touchend', end); 
+            el.style.pointerEvents='auto'; el.style.zIndex=''; el.style.transform='none';
+            const t = e.changedTouches ? e.changedTouches[0] : e;
+            el.hidden = true; const elemBelow = document.elementFromPoint(t.clientX, t.clientY); el.hidden = false;
+            let slot = elemBelow?.closest('[data-slot-id]') || elemBelow?.closest('[id^="bin-"]');
+            let dropped = false;
+
+            if(slot) {
+                if(this.phase===1) {
+                    if(slot.dataset.slotId === el.dataset.id && slot.children.length === 0) {
+                        if(slot.innerText == slot.dataset.slotId) slot.innerHTML = '';
+                        slot.appendChild(el); slot.classList.add('bg-green-100','border-green-500'); el.onmousedown=null; el.ontouchstart=null; el.style.position='static'; 
+                        this.updateScore(10); this.completedSlots++; 
+                        createPopup(t.clientX,t.clientY,"Benar!",true); 
+                        AudioMgr.playCorrect(); 
+                        if(this.completedSlots===6) setTimeout(()=>this.startPhase2(),1000);
+                        dropped=true;
+                    }
+                } else { // Phase 2
+                    const targetType = slot.id.includes('rukun') ? 'rukun' : 'sunnah';
+                    if(targetType === el.dataset.type) { 
+                        this.updateScore(10); el.remove(); 
+                        createPopup(t.clientX,t.clientY,"Benar!",true); 
+                        AudioMgr.playCorrect(); 
+                        this.spawnNextP2(); 
+                    } else { 
+                        this.updateScore(-5); 
+                        createPopup(t.clientX,t.clientY,"Salah!",false);
+                        AudioMgr.playWrong(); 
+                    }
+                    dropped=true; 
+                }
+            }
+            if(!dropped && this.phase===1) { el.style.position='static'; this.container.querySelector('.cards').appendChild(el); }
+            else if(!dropped && this.phase===2) { el.style.position='static'; this.container.querySelector('.spawn-area').appendChild(el); }
+        };
+        el.onmousedown=start; el.ontouchstart=start;
+    }
+    startPhase2() {
+        this.phase=2; this.updateScore(0);
+        this.container.innerHTML = `<div class="w-full h-full flex flex-col items-center justify-end pb-8 pointer-events-auto">
+            <div class="bg-white/90 px-6 py-2 rounded-xl mb-8 font-bold shadow text-lg">Fase 2: Pisahkan Wajib & Sunnah</div>
+            <div class="flex w-full justify-center gap-20 px-10 mb-8 items-end">
+                <div id="bin-rukun" class="w-64 h-80 bg-emerald-100 border-8 border-emerald-500 rounded-t-3xl flex flex-col items-center justify-center text-3xl font-bold text-center text-emerald-800 shadow-xl">WAJIB<br><span class="text-lg font-normal">Syarat Sah</span></div>
+                <div class="spawn-area w-40 h-40 flex items-center justify-center"></div>
+                <div id="bin-sunnah" class="w-64 h-80 bg-amber-100 border-8 border-amber-500 rounded-t-3xl flex flex-col items-center justify-center text-3xl font-bold text-center text-amber-800 shadow-xl">SUNNAH<br><span class="text-lg font-normal">Penyempurna</span></div>
+            </div></div>`;
+        this.p2Items = [{t:'Niat Wudhu',i:'💭',y:'rukun'},{t:'Membasuh Wajah',i:'🤲',y:'rukun'},{t:'Membaca Basmalah',i:'📜',y:'sunnah'},{t:'Membasuh Telinga',i:'👂',y:'sunnah'}];
+        this.spawnNextP2();
+    }
+    spawnNextP2() {
+        if(this.p2Items.length===0) { this.win("Wudhu Sempurna!"); return; }
+        const d = this.p2Items.pop();
+        const c = this.createEl('div', 'draggable-item w-40 h-40 bg-white rounded-xl shadow-2xl border-4 border-slate-500 flex flex-col items-center justify-center', `<span class="text-6xl pointer-events-none mb-2">${d.i}</span><span class="text-lg font-bold pointer-events-none text-center px-1">${d.t}</span>`);
+        c.dataset.type = d.y;
+        this.container.querySelector('.spawn-area').appendChild(c);
+        this.addDrag(c);
+    }
+    update() {} draw(ctx) { this.drawBg(ctx); }
+}
+
+/** LEVEL 3: PERPUSTAKAAN KITAB (Fix Logic) */
+class Level3 extends LevelBase {
+    constructor(cid, sid, n) { super(cid, sid, n); }
+    start() {
+        this.container.innerHTML = `<div class="w-full h-full flex flex-col items-center"><div class="mt-24 bg-white/90 px-6 py-2 rounded-xl font-bold shadow text-lg">Misi 1: Pasangkan Kitab dengan Nabi Penerimanya</div><div class="card-area w-full h-1/3 flex items-center justify-center relative pointer-events-auto"></div><div class="target-area w-full h-1/2 flex flex-wrap justify-center items-end pb-8 gap-4 px-4 pointer-events-auto"></div></div>`;
+        this.setup();
+    }
+    setup() {
+        const pairs = [{id:'t',k:'Kitab Taurat',n:'Nabi Musa AS',c:'bg-red-100'},{id:'z',k:'Kitab Zabur',n:'Nabi Daud AS',c:'bg-green-100'},{id:'i',k:'Kitab Injil',n:'Nabi Isa AS',c:'bg-blue-100'},{id:'q',k:'Kitab Al-Qur\'an',n:'Nabi Muhammad SAW',c:'bg-amber-100'}];
+        const tArea = this.container.querySelector('.target-area');
+        pairs.forEach(p => { const t = this.createEl('div', `w-[20%] h-48 ${p.c} border-t-8 border-slate-400 rounded-t-xl flex flex-col items-center justify-end pb-4 text-sm font-bold text-center leading-tight shadow-md`, `<span>${p.n}</span>`); t.dataset.id = p.id; tArea.appendChild(t); });
+        this.queue = [...pairs]; 
+        this.phase2Q = [{t:"Rajin Membaca Al-Qur'an",y:'yes',i:'📖'},{t:"Merobek Halaman Kitab Suci",y:'no',i:'✂️'},{t:"Mengamalkan Isi Al-Qur'an",y:'yes',i:'🤝'},{t:"Tidak Percaya Kitab Allah",y:'no',i:'🚫'}];
+        this.spawnNext();
+    }
+    spawnNext() {
+        if(this.queue.length===0) { this.startPhase2(); return; }
+        const d = this.queue.pop();
+        const card = this.createEl('div', 'draggable-item w-40 h-40 bg-white rounded-xl shadow-2xl border-4 border-slate-600 flex items-center justify-center font-bold text-xl text-center p-2 absolute z-50', d.k);
+        card.dataset.id = d.id; card.style.transform = `rotate(${Math.random()*10-5}deg)`;
+        this.container.querySelector('.card-area').appendChild(card);
+        this.addDrag(card, 1);
+    }
+    startPhase2() {
+        this.container.innerHTML = `<div class="w-full h-full flex flex-col items-center justify-end pb-8 pointer-events-auto"><div class="bg-white/90 px-6 py-2 rounded-xl mb-8 font-bold shadow text-lg">Fase 2: Apakah ini Perilaku Beriman?</div><div class="flex w-full justify-between px-20 mb-8 items-end"><div id="bin-yes" class="w-48 h-64 bg-green-100 border-8 border-green-500 rounded-t-3xl flex items-center justify-center text-5xl font-bold text-green-800 text-center">👍<br><span class="text-lg">Beriman</span></div><div class="spawn-area w-40 h-40 flex items-center justify-center"></div><div id="bin-no" class="w-48 h-64 bg-red-100 border-8 border-red-500 rounded-t-3xl flex items-center justify-center text-5xl font-bold text-red-800 text-center">👎<br><span class="text-lg">Bukan</span></div></div></div>`;
+        this.spawnNextP2();
+    }
+    spawnNextP2() {
+        if(this.phase2Q.length===0) { this.win("Beriman & Beramal!"); return; }
+        const d = this.phase2Q.pop();
+        const c = this.createEl('div', 'draggable-item w-48 h-48 bg-white rounded-xl shadow-2xl border-4 border-slate-500 flex flex-col items-center justify-center text-center p-2', `<span class="text-5xl pointer-events-none mb-2">${d.i}</span><span class="text-lg font-bold pointer-events-none leading-tight">${d.t}</span>`);
+        c.dataset.type = d.y;
+        this.container.querySelector('.spawn-area').appendChild(c);
+        this.addDrag(c, 2);
+    }
+    addDrag(el, phase) {
+        let sx, sy, ix, iy;
+        const start = (e) => { const t=e.touches?e.touches[0]:e; sx=t.clientX; sy=t.clientY; const r=el.getBoundingClientRect(); ix=r.left; iy=r.top; el.style.position='fixed'; el.style.left=ix+'px'; el.style.top=iy+'px'; el.style.zIndex=100; el.style.pointerEvents='none'; window.addEventListener('mousemove', move); window.addEventListener('touchmove', move, {passive:false}); window.addEventListener('mouseup', end); window.addEventListener('touchend', end); };
+        const move = (e) => { e.preventDefault(); const t=e.touches?e.touches[0]:e; el.style.transform=`translate(${t.clientX-sx}px, ${t.clientY-sy}px)`; };
+        const end = (e) => { window.removeEventListener('mousemove', move); window.removeEventListener('touchmove', move); window.removeEventListener('mouseup', end); window.removeEventListener('touchend', end); el.style.zIndex=''; el.style.pointerEvents='auto'; el.style.position='absolute'; el.style.left=''; el.style.top=''; el.style.transform='none';
+            
+            const t = e.changedTouches ? e.changedTouches[0] : e;
+            el.hidden = true; const elemBelow = document.elementFromPoint(t.clientX, t.clientY); el.hidden = false;
+            if(phase===1) {
+                const target = elemBelow?.closest('[data-id]');
+                if(target && target.dataset.id === el.dataset.id) {
+                    this.updateScore(12.5); el.remove(); createPopup(t.clientX,t.clientY,"Benar!",true); AudioMgr.playCorrect(); this.spawnNext();
+                } else {
+                    this.updateScore(-2); createPopup(t.clientX,t.clientY,"Salah!",false); AudioMgr.playWrong();
+                }
+            } else {
+                const bin = elemBelow?.closest('[id^="bin-"]');
+                if(bin) {
+                    const type = bin.id === 'bin-yes' ? 'yes' : 'no';
+                    if(type === el.dataset.type) {
+                        this.updateScore(12.5); el.remove(); createPopup(t.clientX,t.clientY,"Benar!",true); AudioMgr.playCorrect(); this.spawnNextP2();
+                    } else {
+                        this.updateScore(-2); createPopup(t.clientX,t.clientY,"Salah!",false); AudioMgr.playWrong();
+                    }
+                }
+            }
+        }; el.onmousedown=start; el.ontouchstart=start;
+    }
+    draw(ctx) { this.drawBg(ctx); }
+}
+
+/** LEVEL 4: DESA PARA NABI */
+class Level4 extends LevelBase {
+    constructor(cid, sid, n) { super(cid, sid, n); this.lines=[]; this.drag=null; }
+    start() {
+        this.container.innerHTML = `<div class="w-full h-full flex items-center justify-between px-10 pt-20 pointer-events-auto"><div class="col-l flex flex-col gap-4 w-1/3"></div><div class="col-r flex flex-col gap-4 w-1/3"></div></div>`;
+        const d = [{id:1,l:"Nabi Nuh AS",r:"Membuat Bahtera Besar"},{id:2,l:"Nabi Ibrahim AS",r:"Tidak Hangus Dibakar Api"},{id:3,l:"Nabi Musa AS",r:"Membelah Laut Merah"},{id:4,l:"Nabi Isa AS",r:"Menghidupkan Orang Mati"},{id:5,l:"Nabi Muhammad SAW",r:"Al-Qur'an & Isra Mi'raj"}];
+        const lC = this.container.querySelector('.col-l'); const rC = this.container.querySelector('.col-r');
+        d.forEach(x => { const b=this.createEl('div','w-full bg-white p-4 rounded-xl shadow-lg font-bold border-l-8 border-green-500 text-lg',x.l); b.dataset.id=x.id; b.dataset.side='L'; this.addTouch(b); lC.appendChild(b); });
+        [...d].sort(()=>Math.random()-0.5).forEach(x => { const b=this.createEl('div','w-full bg-white p-4 rounded-xl shadow-lg font-bold text-right border-r-8 border-blue-500 text-lg',x.r); b.dataset.id=x.id; b.dataset.side='R'; rC.appendChild(b); });
+    }
+    addTouch(el) {
+        const start = (e) => { e.preventDefault(); const t=e.touches?e.touches[0]:e; const r=el.getBoundingClientRect(); this.drag={el:el,id:el.dataset.id,sx:r.right,sy:r.top+r.height/2,cx:t.clientX,cy:t.clientY}; window.addEventListener('mousemove',move); window.addEventListener('touchmove',move,{passive:false}); window.addEventListener('mouseup',end); window.addEventListener('touchend',end); };
+        const move = (e) => { e.preventDefault(); if(!this.drag)return; const t=e.touches?e.touches[0]:e; this.drag.cx=t.clientX; this.drag.cy=t.clientY; };
+        const end = (e) => { window.removeEventListener('mousemove',move); window.removeEventListener('touchmove',move); window.removeEventListener('mouseup',end); window.removeEventListener('touchend',end);
+            if(!this.drag)return; 
+            const t=document.elementFromPoint(this.drag.cx,this.drag.cy)?.closest('[data-side="R"]');
+            if(t && t.closest(`#${this.container.id}`) && t.dataset.id===this.drag.id) {
+                const tr=t.getBoundingClientRect(); this.lines.push({sx:this.drag.sx,sy:this.drag.sy,ex:tr.left,ey:tr.top+tr.height/2});
+                this.drag.el.classList.add('bg-green-200'); t.classList.add('bg-green-200'); 
+                this.updateScore(10); 
+                createPopup(this.drag.cx,this.drag.cy,"Benar!",true);
+                AudioMgr.playCorrect(); // Sound
+                if(this.lines.length===5) setTimeout(()=>this.startPhase2(),1000);
+            } else { 
+                createPopup(this.drag.cx,this.drag.cy,"Salah!",false);
+                AudioMgr.playWrong(); // Sound
+            }
+            this.drag=null;
+        }; el.onmousedown=start; el.ontouchstart=start;
+    }
+    startPhase2() {
+        this.container.innerHTML = `<div class="w-full h-full flex flex-col items-center justify-end pb-8 pointer-events-auto"><div class="bg-white/90 px-6 py-2 rounded-xl mb-8 font-bold shadow text-lg">Fase 2: Pilih Sifat Utama Ulul Azmi!</div><div class="flex w-full justify-between px-20 mb-8 items-end"><div id="bin-yes" class="w-48 h-64 bg-emerald-100 border-8 border-emerald-500 rounded-t-3xl flex flex-col items-center justify-center text-2xl font-bold text-emerald-800 text-center">SIFAT<br>TERPUJI</div><div class="spawn-area w-40 h-40 flex items-center justify-center"></div><div id="bin-no" class="w-48 h-64 bg-red-100 border-8 border-red-500 rounded-t-3xl flex flex-col items-center justify-center text-2xl font-bold text-red-800 text-center">BUKAN<br>SIFAT</div></div></div>`;
+        this.p2Q = [{t:"Sabar Luar Biasa",y:'yes'},{t:"Teguh Hati",y:'yes'},{t:"Putus Asa",y:'no'},{t:"Cepat Marah",y:'no'},{t:"Ikhlas Berdakwah",y:'yes'}];
+        this.spawnNextP2();
+    }
+    spawnNextP2() {
+        if(this.p2Q.length===0) { this.win("Teladan Utama!"); return; }
+        const d = this.p2Q.pop();
+        const c = this.createEl('div', 'draggable-item w-40 h-40 bg-white rounded-xl shadow-2xl border-4 border-slate-500 flex flex-col items-center justify-center text-center p-2', `<span class="text-2xl font-bold pointer-events-none">${d.t}</span>`);
+        c.dataset.type = d.y; this.container.querySelector('.spawn-area').appendChild(c);
+        
+        let sx, sy, ix, iy;
+        const start = (e) => { const t=e.touches?e.touches[0]:e; sx=t.clientX; sy=t.clientY; const r=c.getBoundingClientRect(); ix=r.left; iy=r.top; c.style.position='fixed'; c.style.left=ix+'px'; c.style.top=iy+'px'; c.style.zIndex=100; c.style.pointerEvents='none'; window.addEventListener('mousemove', move); window.addEventListener('touchmove', move, {passive:false}); window.addEventListener('mouseup', end); window.addEventListener('touchend', end); };
+        const move = (e) => { e.preventDefault(); const t=e.touches?e.touches[0]:e; c.style.transform=`translate(${t.clientX-sx}px, ${t.clientY-sy}px)`; };
+        const end = (e) => { window.removeEventListener('mousemove', move); window.removeEventListener('touchmove', move); window.removeEventListener('mouseup', end); window.removeEventListener('touchend', end); c.style.zIndex=''; c.style.position='absolute'; c.style.left=''; c.style.top=''; c.style.transform='none'; c.style.pointerEvents='auto';
+            const t = e.changedTouches ? e.changedTouches[0] : e;
+            c.hidden = true; const elemBelow = document.elementFromPoint(t.clientX, t.clientY); c.hidden = false;
+            const bin = elemBelow?.closest('[id^="bin-"]');
+            if(bin) {
+                const type = bin.id === 'bin-yes' ? 'yes' : 'no';
+                if(type === c.dataset.type) { this.updateScore(10); c.remove(); createPopup(t.clientX,t.clientY,"Benar!",true); AudioMgr.playCorrect(); this.spawnNextP2(); }
+                else { this.updateScore(-2); createPopup(t.clientX,t.clientY,"Salah!",false); AudioMgr.playWrong(); }
+            }
+        }; c.onmousedown=start; c.ontouchstart=start;
+    }
+    draw(ctx) { this.drawBg(ctx); ctx.lineWidth=4; ctx.lineCap='round'; this.lines.forEach(l=>{ctx.beginPath(); ctx.strokeStyle="#10b981"; ctx.moveTo(l.sx,l.sy); ctx.lineTo(l.ex,l.ey); ctx.stroke();}); if(this.drag){ctx.beginPath(); ctx.strokeStyle="#fbbf24"; ctx.moveTo(this.drag.sx,this.drag.sy); ctx.lineTo(this.drag.cx,this.drag.cy); ctx.stroke();} }
+}
+
+/** LEVEL 5: GURUN PUASA (Full Sentences) */
+class Level5 extends LevelBase {
+    constructor(cid, sid, n) { super(cid, sid, n); this.px=game.width/2; this.items=[]; this.timer=0; 
+        this.goods=[{t:"Menelan Ludah (Tidak Sengaja)",i:"🤤"},{t:"Tidur Siang Sejenak",i:"😴"},{t:"Mandi Agar Segar",i:"🚿"},{t:"Menggosok Gigi",i:"🪥"}]; 
+        this.bads=[{t:"Makan Nasi (Sengaja)",i:"🍚"},{t:"Minum Es (Sengaja)",i:"🥤"},{t:"Muntah Dengan Sengaja",i:"🤮"}]; 
+        this.playerImg = new Image();
+        this.playerImg.src = game.charImgUrl;
+    }
+    start() {
+        this.handler = (e) => {
+            if(!this.active) return;
+            const t = e.changedTouches ? e.changedTouches[0] : e;
+            this.px = t.clientX;
+        };
+        window.addEventListener('mousemove', this.handler); window.addEventListener('touchmove', this.handler);
+    }
+    destroy() { window.removeEventListener('mousemove', this.handler); window.removeEventListener('touchmove', this.handler); }
+    update() {
+        if(!this.active) return;
+        if(this.score >= 100) { this.active=false; this.destroy(); this.win("Puasa Sah!"); return; }
+        if(++this.timer > 50) {
+            const isGood = Math.random()>0.5; const p = isGood?this.goods:this.bads; const d = p[Math.floor(Math.random()*p.length)];
+            this.items.push({x:Math.random()*(game.width-100)+50, y:-50, g:isGood, i:d.i, t:d.t}); this.timer=0;
+        }
+        this.items.forEach((i,x)=>{
+            i.y+=4;
+            if(i.y > game.height-100 && Math.abs(i.x - this.px) < 100) { 
+                this.items.splice(x,1); 
+                if(i.g) {
+                    this.updateScore(10); 
+                    createPopup(this.px, game.height-150, "+10", true);
+                    AudioMgr.playCorrect(); 
+                } else {
+                    this.updateScore(-10); 
+                    createPopup(this.px, game.height-150, "Batal!", false);
+                    AudioMgr.playWrong(); 
+                } 
+            }
+            if(i.y > game.height) this.items.splice(x,1);
+        });
+    }
+    draw(ctx) {
+        if(!this.active) return;
+        this.drawBg(ctx);
+        if(this.playerImg.complete) {
+            ctx.drawImage(this.playerImg, this.px - 60, game.height - 180, 120, 120);
+        } else {
+            ctx.font="80px Arial"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(game.char==='Alif'?'👦🏻':'🧕🏻', this.px, game.height-80);
+        }
+        this.items.forEach(i => {
+            ctx.fillStyle = i.g ? '#d1fae5' : '#fee2e2'; ctx.strokeStyle = i.g ? '#10b981' : '#ef4444'; ctx.lineWidth=3;
+            ctx.beginPath(); ctx.roundRect(i.x-90, i.y-45, 180, 90, 15); ctx.fill(); ctx.stroke();
+            ctx.fillStyle="#000"; ctx.font="40px Arial"; ctx.fillText(i.i, i.x, i.y-10); ctx.fillStyle=i.g?'#065f46':'#991b1b'; ctx.font="bold 16px Fredoka"; ctx.fillText(i.t, i.x, i.y+25);
+        });
+    }
+}
+
+/** LEVEL 6: MASJID ZAKAT (Left-Right Split) */
+class Level6 extends LevelBase {
+    constructor(cid, sid, n) { super(cid, sid, n); this.qIdx = 0; this.inVal = "";
+        this.qs = [
+            {q:"Keluarga Pak Ahmad terdiri dari ayah, ibu, dan 3 orang anak. Zakat fitrah 2,5 kg beras per orang. Berapa total beras yang harus dikeluarkan?", a:12.5},
+            {q:"Ibu Siti ingin membayar zakat untuk 4 orang. Harga beras Rp12.000/kg. Jika membayar dengan uang, berapa yang harus dibayar?", a:120000},
+            {q:"Keluarga Pak Budi terdiri dari 6 orang. Wajib zakat 2,5 kg/orang. Berapa total beras yang harus disiapkan?", a:15},
+            {q:"Ayah Ani membeli 10 kg beras zakat. Jika zakat per orang 2,5 kg, berapa jumlah anggota keluarga Ani?", a:4}
+        ];
+    }
+    start() { this.render(); }
+    render() {
+        if(this.qIdx >= this.qs.length) { this.win("Ahli Zakat!"); return; }
+        const q = this.qs[this.qIdx];
+        this.container.innerHTML = `
+            <div class="w-full h-full p-8 flex gap-8 pointer-events-auto items-center justify-center">
+                <!-- Left: Question -->
+                <div class="w-1/2 h-3/4 bg-white p-8 rounded-2xl shadow-xl border-l-8 border-purple-500 flex flex-col justify-center">
+                    <p class="text-lg font-bold text-purple-600 mb-4">Soal Cerita No. ${this.qIdx+1}</p>
+                    <p class="text-2xl font-bold leading-relaxed text-slate-800">${q.q}</p>
+                </div>
+                <!-- Right: Calculator -->
+                <div class="w-1/3 bg-slate-200 p-6 rounded-3xl shadow-inner">
+                    <div class="bg-black/80 p-4 rounded-xl mb-4 text-right text-white font-mono text-4xl h-20 flex items-center justify-end">${this.inVal||"0"}</div>
+                    <div class="calc-grid gap-4">
+                        ${[1,2,3,4,5,6,7,8,9].map(n => `<button class="bg-white py-4 rounded-xl shadow font-bold text-3xl active:scale-95 text-slate-700 hover:bg-purple-50 transition" onclick="game.activeLevel.input(${n})">${n}</button>`).join('')}
+                        <button class="bg-red-100 py-4 rounded-xl shadow font-bold text-3xl text-red-600 hover:bg-red-200" onclick="game.activeLevel.clr()">C</button>
+                        <button class="bg-white py-4 rounded-xl shadow font-bold text-3xl text-slate-700 hover:bg-purple-50" onclick="game.activeLevel.input(0)">0</button>
+                        <button class="bg-white py-4 rounded-xl shadow font-bold text-3xl text-slate-700 hover:bg-purple-50" onclick="game.activeLevel.input('.')">.</button>
+                    </div>
+                    <button class="mt-6 w-full bg-green-500 text-white py-4 rounded-xl font-bold text-3xl shadow-lg active:scale-95 border-b-8 border-green-700 hover:bg-green-600 transition" onclick="game.activeLevel.sub()">JAWAB</button>
+                </div>
+            </div>`;
+    }
+    input(n) { if(this.inVal.length<8) this.inVal+=n; this.render(); }
+    clr() { this.inVal=""; this.render(); }
+    sub() {
+        if(parseFloat(this.inVal) === this.qs[this.qIdx].a) { 
+            this.updateScore(25); 
+            this.qIdx++; 
+            this.inVal=""; 
+            createPopup(game.width/2, game.height/2, "Benar!", true); 
+            AudioMgr.playCorrect(); 
+            this.render(); 
+        }
+        else { 
+            this.inVal=""; 
+            this.render(); 
+            createPopup(game.width/2, game.height/2, "Coba Lagi", false); 
+            AudioMgr.playWrong(); 
+        }
+    }
+    draw(ctx) { this.drawBg(ctx); }
+}
+
+window.onload = () => game.init();
+</script>
+</body>
+</html>
